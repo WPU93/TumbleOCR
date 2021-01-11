@@ -1,0 +1,65 @@
+Global:
+  aug: true
+  checkpoints: ../save_models/
+  dict_path: tumbocr/dict/dict.txt
+  start_epoch: 0
+  epochs: 100
+  gpu: null
+  model_name: myModel-ResNet-ctc-2d-tps
+  out_seq_len: 40
+  pretrained: ""
+  print_feq: 10
+  resume: false  
+  save_iter: 20000
+  val_iter: 20000
+  loss : ctc
+Model:
+  arch: myModel
+  tps: 
+    name: large
+    num_fiducial: 20
+  backbone: 
+    name: ResNet # [MobileNetV3, ResNet]
+    feat_channels: 512 # MobileNetV3 480, ResNet 512
+  encoder:
+    name: rnn
+    hidden_dim: 256
+  decoder:
+    name: 2d-attn
+    embedding_size: 256
+    hidden_dim_de: 256
+    attn_embedding: false
+  prediction:
+    name: fc
+Optimizer:
+  name: adam
+  lr: 0.0008
+  momentum: 0.9
+  weight_decay: 0.0
+  scheduler: 
+    name: step
+    milestones_list: [5, 15, 25]
+    gamma: 0.1
+  warmup: -1
+  warmup_lr: 1.0e-06
+Train:
+  rand_aug: true
+  text_aug: true
+  balanced_pow: 1
+  batch_size: 960
+  drop_last: true
+  image_shape:
+  - 48
+  - 160
+  shuffle: true
+  train_path: /data/remote/ocr_data/OCR_GT/train_art_baidu_mtwi_rects_mine_url.txt
+  workers: 32
+Val:
+  batch_size: 960
+  drop_last: true
+  image_shape:
+  - 48
+  - 160
+  shuffle: true
+  val_path: /data/remote/ocr_data/OCR_GT/openReal/MTWI2018_test_url.txt
+  workers: 32

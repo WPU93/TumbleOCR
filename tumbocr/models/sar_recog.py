@@ -1,0 +1,164 @@
+import torch.nn as nn
+import math
+import torch
+import torch.nn.functional as F
+
+
+class Recogniton(nn.Module):
+
+    def __init__(self, config):
+        super(Recogniton, self).__init__()
+        self.device = config.Global.device
+        self.out_seq_len = config.Global.out_seq_len
+        self.num_classes = config.Global.num_classes
+
+        self.num_layers = config.Model.num_layers
+        self.feature_layers = config.Model.feature_layers
+        self.hidden_dim = config.Model.hidden_dim
+        self.hidden_dim_de = config.Model.hidden_dim_de
+
+        self.NULL_TOKEN = 0
+        self.START_TOKEN = config.Global.num_classes - 1
+        self.END_TOKEN = config.Global.num_classes - 1
+
+
+        self.maxpool1 = nn.MaxPool2d((6, 1), stride=(6, 1))
+        self.encode_lstm = nn.LSTM(
+            self.feature_layers, self.hidden_dim, 1, bidirectional=True)
+        self.linear_encode = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        self.de_lstm_u = nn.ModuleList()
+
+        for i in range(self.num_layers):
+            self.de_lstm_u.append(nn.LSTMCell(
+                self.hidden_dim, self.hidden_dim_de))
+        self.embed = nn.Embedding(self.num_classes, self.hidden_dim)
+
+        self.attention_nn = Attention_nn(config)
+        self.linear_out = nn.Linear(
+            self.hidden_dim_de + self.feature_layers, self.num_classes)
+        self.logsoftmax = nn.LogSoftmax(dim=-1)
+
+    def forward(self, conv_f, target=None):  # [-1, 512, 6, 40] | -1 30
+        self.encode_lstm.flatten_parameters() 
+        self.batch_size = conv_f.shape[0]
+        x = self.maxpool1(conv_f)  # [-1, 512, 1, 40]
+        x = torch.squeeze(x, 2)  # [-1, 512, 40]
+        x = x.permute(2, 0, 1)
+        self.hidden_en = (torch.zeros(self.num_layers, self.batch_size, self.hidden_dim).to(self.device),
+                          torch.zeros(self.num_layers, self.batch_size, self.hidden_dim).to(self.device))
+
+        # [40, -1, 512]
+        x, self.hidden_en = self.encode_lstm(x, self.hidden_en)
+        x = self.linear_encode(x)
+        holistic_feature = x[-1]  # [-1 512]
+        # decode model
+        if self.training:
+            self.out_seq_len = target.shape[1]
+            self.init_de_lstm()
+            self.gt_with_start[:, 1:] = target
+            self.gt_with_start[:, 0] = self.START_TOKEN
+            self.forward_train(holistic_feature, conv_f, self.gt_with_start)
+            return self.out
+        else:
+            self.init_de_lstm()
+            self.forward_test(holistic_feature, conv_f)
+            #seq = self.seq[1:]
+            #return self.seq, self.seq_score
+            return self.seq[:,1:]
+
+    def init_de_lstm(self):
+        self.hidden_de = []
+        for i in range(self.num_layers):
+            self.hidden_de.append((torch.zeros(self.batch_size, self.hidden_dim_de).to(self.device)
+                , torch.zeros(self.batch_size, self.hidden_dim_de).to(self.device)))
+        self.out = torch.zeros(self.batch_size, self.out_seq_len + 2, self.num_classes).to(self.device)
+        self.gt_with_start = torch.zeros(
+            self.batch_size, self.out_seq_len + 1).to(self.device)
+        self.seq = torch.zeros(self.batch_size, self.out_seq_len + 2).to(self.device)
+        self.seq_score = torch.zeros(self.batch_size, self.out_seq_len + 2).to(self.device)
+
+    def forward_train(self, holistic_feature, conv_f, target):
+        # target batch_size*L   L<max_w
+        for t in range(self.out_seq_len + 2):
+            if t == 0:
+                xt = holistic_feature
+            else:
+                it = target[:, t - 1]
+                it = it.view(-1).to(torch.long).to(self.device)
+                xt = self.embed(it)
+
+            for i in range(self.num_layers):
+                if i == 0:
+                    inp = xt
+                else:
+                    inp = self.hidden_de[i - 1][0]
+                self.hidden_de[i] = self.de_lstm_u[
+                    i](inp, self.hidden_de[i])  # -1 512
+            h = self.hidden_de[-1][0]
+            att, attw = self.attention_nn(conv_f, h)  # -1 512 |  -1  h*w
+            tmpcat = torch.cat((h, att), -1)
+            scores = self.logsoftmax(self.linear_out(tmpcat))  # -1 vc_s+1
+            self.out[:, t, :] = scores
+
+    def forward_test(self, holistic_feature, conv_f):
+        for t in range(self.out_seq_len + 2):
+            if t == 0:
+                xt = holistic_feature
+            elif t == 1:
+                it = torch.zeros(self.batch_size).fill_(
+                    self.START_TOKEN).to(torch.long).to(self.device)
+                xt = self.embed(it)
+            else:
+                it = self.seq[:, t - 1]
+                it = it.view(-1).to(torch.long).to(self.device)
+                xt = self.embed(it)
+            for i in range(self.num_layers):
+                if i == 0:
+                    inp = xt
+                else:
+                    inp = self.hidden_de[i - 1][0]
+                self.hidden_de[i] = self.de_lstm_u[
+                    i](inp, self.hidden_de[i])  # -1 512
+            h = self.hidden_de[-1][0]
+            att, attw = self.attention_nn(conv_f, h)  # -1 512 |  -1  h*w
+            tmpcat = torch.cat((h, att), -1)
+            scores = self.logsoftmax(self.linear_out(tmpcat))  # -1 vc_s+1
+            idxscore, idx = torch.max(scores, 1)
+            self.seq[:, t] = idx
+            self.seq_score[:, t] = idxscore
+
+
+class Attention_nn(nn.Module):
+    # TODO:get the valid ones
+
+    def __init__(self, config):
+        super(Attention_nn, self).__init__()
+        self.feature_layers = config.Model.feature_layers
+        self.hidden_dim_de = config.Model.hidden_dim_de
+        self.embedding_size = config.Model.embedding_size
+        self.conv_h = nn.Linear(self.hidden_dim_de, self.embedding_size)
+        self.conv_f = nn.Conv2d(self.feature_layers,
+                                self.embedding_size, kernel_size=3, padding=1)
+        self.conv_att = nn.Linear(self.embedding_size, 1)
+        self.dropout = nn.Dropout(p=0.5)
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, conv_f, h):  # [-1, 512, 6, 40]  | -1 512
+        g_em = self.conv_h(h)
+        g_em = g_em.view(g_em.shape[0], -1, 1)
+        g_em = g_em.repeat(1, 1, conv_f.shape[
+                           2] * conv_f.shape[3])  # -1 512 h*w
+        g_em = g_em.permute(0, 2, 1)
+        x_em = self.conv_f(conv_f)
+        x_em = x_em.view(x_em.shape[0], -1, g_em.shape[1])
+        x_em = x_em.permute(0, 2, 1)
+        feat = self.dropout(torch.tanh(x_em + g_em))  # -1 h*w 512
+        e = self.conv_att(feat.view(-1, self.embedding_size))  # -1*h*w 1
+        alpha = self.softmax(e.view(-1,  g_em.shape[1]))  # -1  h*w
+        alpha2 = alpha.view(-1, 1,  g_em.shape[1])  # -1 1 h*w
+        orgfeat_embed = conv_f.view(-1, self.feature_layers,
+                                    g_em.shape[1])
+        orgfeat_embed = orgfeat_embed.permute(0, 2, 1)  # -1 h*w 512
+        att_out = torch.matmul(alpha2, orgfeat_embed)
+        att_out = att_out.view(-1, self.feature_layers)  # -1 512
+        return att_out, alpha

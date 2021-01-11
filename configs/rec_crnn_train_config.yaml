@@ -1,0 +1,50 @@
+Global:
+  aug: true
+  checkpoints: ./checkpoints/
+  dict_path: tumbocr/dict/dict.txt
+  epochs: 100
+  gpu: null
+  out_seq_len: 40
+  pretrained_path: ''
+  print_feq: 10
+  resume: true
+  save_iter: 10000
+  start_epoch: 0
+  val_iter: 10000
+Model:
+  arch: crnn
+  backbone: resnet31
+  ctc: true
+  embedding_size: 512
+  featrue_layers: 512
+  hidden_dim: 512
+  hidden_dim_de: 512
+  # num_layers: 2
+Optimizer:
+  lr: 0.001
+  scheduler: null
+  type: Adam
+  warmup: -1
+  warmup_lr: 1.0e-06
+  weight_decay: 0.0
+Train:
+  aug: true
+  balanced: true
+  batch_size: 448
+  drop_last: true
+  image_shape:
+  - 48
+  - 160
+  shuffle: true
+  train_path: /data/remote/ocr_data/OCR_GT/train_art_baidu_mtwi_rects_mine_url.txt
+  workers: 32
+Val:
+  aug: false
+  batch_size: 128
+  drop_last: true
+  image_shape:
+  - 48
+  - 160
+  shuffle: true
+  val_path: /data/remote/ocr_data/OCR_GT/art_baidu_mtwi_rects_360_90k_bz512_url.txt
+  workers: 32
