@@ -22,7 +22,7 @@
     python-Levenshtein
     easydict
     pyyaml
-运行./env.sh
+运行./scripts/env.sh
 ```
 ## 模型训练
 #### 生成相应的字典
@@ -32,7 +32,7 @@
 通用的server模型[config](configs/rec_sar_train_config.yaml)
 通用的mobile模型[config](configs/rec_ctc_mbv3_att2d_config.yaml)
 ```
-运行./env.sh
+运行./scripts/run.sh
 ```
 ## 数据增强
 

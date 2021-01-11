@@ -12,7 +12,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 # data
-from tumbocr.data.load_data_url import ocrDataset
+from tumbocr.data.loadRecDataset import recDataset
 from tumbocr.data.data_utils import get_vocabulary
 from tumbocr.models.create_model import create_model
 from tumbocr.optim_factory import create_optimizer
@@ -66,10 +66,10 @@ def main(cfg):
     #---data---
     imgH,imgW = cfg.Train.image_shape[0],cfg.Train.image_shape[1]
     train_transform,val_transform = get_transforms(rand_aug=cfg.Train.rand_aug)
-    train_dataset = ocrDataset(cfg.Train.train_path,cfg.Global.dict_path,
+    train_dataset = recDataset(cfg.Train.train_path,cfg.Global.dict_path,
                     cfg.Global.out_seq_len,imgH,imgW,
                     train_transform,is_training=True,text_aug=cfg.Train.text_aug)
-    val_dataset = ocrDataset(cfg.Val.val_path,cfg.Global.dict_path,
+    val_dataset = recDataset(cfg.Val.val_path,cfg.Global.dict_path,
                   cfg.Global.out_seq_len,imgH,imgW,
                   val_transform,is_training=False,text_aug=False)
     
@@ -102,9 +102,9 @@ def main(cfg):
         cfg.Global.start_epoch = resume_checkpoint['epoch']
         optimizer.load_state_dict(resume_checkpoint['optimizer'])
     #---epoch---
-    best_acc = 0.5
+    best_acc = 0
     for epoch in range(cfg.Global.start_epoch,cfg.Global.epochs):
-        seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
+        # seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
         train(train_loader, model, criterion_ctc, criterion_att, optimizer, epoch, scheduler, cfg)
         seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
         if scheduler is not None and cfg.Optimizer.scheduler.name == "step":
