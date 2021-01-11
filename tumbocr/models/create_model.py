@@ -105,7 +105,7 @@ class myModel(nn.Module):
             attn_out = F.log_softmax(attn_out,dim=2)
             if not self.training:
                 idxscore, idx = torch.max(attn_out, 2)
-                return idx
+                return idx[:,1:]
             return attn_out
         else:
             ctc_out = self.Prediction(ctc_out)
@@ -114,7 +114,7 @@ class myModel(nn.Module):
             attn_out = F.log_softmax(attn_out,dim=2)
             if not self.training:
                 idxscore, idx = torch.max(ctc_out+attn_out, 2)
-                return idx
+                return idx[:,1:]
             return ctc_out,attn_out
 
 

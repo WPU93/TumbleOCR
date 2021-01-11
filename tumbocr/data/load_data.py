@@ -7,7 +7,7 @@ from .data_utils import get_vocabulary
 #from data_utils import get_vocabulary
 import urllib
 
-class ocrDataset(Dataset):
+class recDataset(Dataset):
     def __init__(self,data_path,dict_path,maxlen,imgH,imgW,image_transform=None):
         self.size = 0
         self.maxlen = maxlen
@@ -114,7 +114,7 @@ if __name__=="__main__":
     maxlen, imgH, imgW = 30, 48, 160
     data_path = "shupai.txt"
     dict_path = "../dict/dict.txt"
-    train_dataset = ocrDataset(data_path,dict_path,maxlen,imgH,imgW,image_transform)
+    train_dataset = recDataset(data_path,dict_path,maxlen,imgH,imgW,image_transform)
     print("num of data:",len(train_dataset))
     trainset_dataloader = DataLoader(dataset=train_dataset,
                                      batch_size=4,

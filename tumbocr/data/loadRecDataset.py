@@ -9,7 +9,7 @@ from .data_utils import get_vocabulary
 from tumbocr.utils.transforms.text_aug import text_aug
 traindata_list = ["MTWI2018","mySynth","Baidu_recognition_data"]
 
-class ocrDataset(Dataset):
+class recDataset(Dataset):
     def __init__(self,data_path,dict_path,maxlen,imgH,imgW,image_transform=None,is_training=True,text_aug=False):
         self.is_training = is_training
         self.text_aug = text_aug
@@ -103,7 +103,7 @@ if __name__=="__main__":
     maxlen, imgH, imgW = 30, 48, 160
     data_path = "/data/remote/ocr_data/OCR_GT/SynthChinese360w.txt"
     dict_path = "../dict/dict.txt"
-    train_dataset = ocrDataset(data_path,dict_path,maxlen,imgH,imgW,image_transform)
+    train_dataset = recDataset(data_path,dict_path,maxlen,imgH,imgW,image_transform)
     print("num of data:",len(train_dataset))
     trainset_dataloader = DataLoader(dataset=train_dataset,
                                      batch_size=512,
