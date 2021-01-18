@@ -12,7 +12,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 # data
-from tumbocr.data.load_data_url import ocrDataset
+from tumbocr.data.loadRecDataset import recDataset
 from tumbocr.data.data_utils import get_vocabulary
 from tumbocr.models.create_model import create_model
 from tumbocr.optim_factory import create_optimizer
@@ -37,12 +37,7 @@ def main(cfg):
     cfg.Global.num_classes = len(char2id)
     cfg.Global.device = "cuda" if ngpus_per_node > 0 else "cpu"
     #---model---
-    if cfg.Model.arch == "vit":
-        efficient_transformer = Linformer(dim=128,seq_len=41,depth=12,heads=8,k=64)
-        model = ViT(dim=128,image_size=224,patch_size=16,num_classes=6626,transformer=efficient_transformer,channels=3)
-    else:
-        model = create_model(cfg.Model.arch)(cfg)
-    
+    model = create_model(cfg.Model.arch)(cfg)
     # if cfg.Global.loss == "ctc":
     #     criterion_ctc = nn.CTCLoss(blank=0, reduction='mean', zero_infinity=True)
     # elif cfg.Global.loss == "attn":
@@ -58,18 +53,19 @@ def main(cfg):
         else:
             print("=> weights restore from '{}'".format(cfg.Global.pretrained))
             model = from_pretrained(model,cfg.Global.pretrained,is_frozen=False)
-    
-    # model = torch.nn.DataParallel(model).to(cfg.Global.device)
-    gpu0_bsz = 64
-    model = BalancedDataParallel(gpu0_bsz,model,dim=0).cuda()
+    if cfg.Global.balanced_bsz > 0:
+        gpu0_bsz = cfg.Global.balanced_bsz
+        model = BalancedDataParallel(gpu0_bsz,model,dim=0).cuda()
+    else:
+        model = torch.nn.DataParallel(model).to(cfg.Global.device)
 
     #---data---
     imgH,imgW = cfg.Train.image_shape[0],cfg.Train.image_shape[1]
     train_transform,val_transform = get_transforms(rand_aug=cfg.Train.rand_aug)
-    train_dataset = ocrDataset(cfg.Train.train_path,cfg.Global.dict_path,
+    train_dataset = recDataset(cfg.Train.train_path,cfg.Global.dict_path,
                     cfg.Global.out_seq_len,imgH,imgW,
                     train_transform,is_training=True,text_aug=cfg.Train.text_aug)
-    val_dataset = ocrDataset(cfg.Val.val_path,cfg.Global.dict_path,
+    val_dataset = recDataset(cfg.Val.val_path,cfg.Global.dict_path,
                   cfg.Global.out_seq_len,imgH,imgW,
                   val_transform,is_training=False,text_aug=False)
     
@@ -102,9 +98,9 @@ def main(cfg):
         cfg.Global.start_epoch = resume_checkpoint['epoch']
         optimizer.load_state_dict(resume_checkpoint['optimizer'])
     #---epoch---
-    best_acc = 0.5
+    best_acc = 0
     for epoch in range(cfg.Global.start_epoch,cfg.Global.epochs):
-        seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
+        # seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
         train(train_loader, model, criterion_ctc, criterion_att, optimizer, epoch, scheduler, cfg)
         seq_acc,char_acc = validate(val_loader, model, epoch,id2char, cfg)
         if scheduler is not None and cfg.Optimizer.scheduler.name == "step":

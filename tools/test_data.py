@@ -12,7 +12,7 @@ from torch import nn
 # data
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
-from data.load_data_url import ocrDataset
+from data import recDataset
 from data import load_data
 
 if __name__=="__main__":

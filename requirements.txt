@@ -4,3 +4,4 @@ python-Levenshtein
 opencv-python
 easydict
 pyyaml
+einops

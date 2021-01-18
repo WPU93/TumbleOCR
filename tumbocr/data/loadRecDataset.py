@@ -1,12 +1,16 @@
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image,ImageFile
 import urllib
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from .data_utils import get_vocabulary
 #from data_utils import get_vocabulary
 from tumbocr.utils.transforms.text_aug import text_aug
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+Image.MAX_IMAGE_PIXELS = None
+
 traindata_list = ["MTWI2018","mySynth","Baidu_recognition_data"]
 
 class recDataset(Dataset):
@@ -63,6 +67,7 @@ class recDataset(Dataset):
         return image_path 
     def __getitem__(self, index):
         image_path = self.images_list[index]
+        image_path = image_path.replace("filer.ai.yy.com:9899","10.28.32.57:9200")
         label = self.labels_list[index]
         length = self.length_list[index]
         text = self.texts_list[index]

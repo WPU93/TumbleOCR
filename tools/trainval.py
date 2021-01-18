@@ -34,14 +34,14 @@ def train(train_loader, model, criterion_ctc, criterion_att,optimizer,epoch,sche
             preds_length = torch.IntTensor([preds.size(0)] * config.Train.batch_size).cuda(config.Global.gpu, non_blocking=True)
             losses = criterion_ctc(preds, targets, preds_length, length)
         elif config.Global.loss == "attn" :
-            l_target = torch.zeros(config.Train.batch_size,config.Global.out_seq_len,
+            gt_with_start = torch.zeros(config.Train.batch_size,config.Global.out_seq_len,
                    dtype=torch.long).cuda(config.Global.gpu, non_blocking=True)
-            l_target[:, 1:] = targets[:,:-1]
-            out = model(imgs, targets)
+            gt_with_start[:, 1:] = targets[:,:-1]# sos is 0
+            out = model(imgs, gt_with_start)
             out = out.view(-1,config.Global.num_classes)
-            l_target = l_target.view(-1)
-            mask = torch.eq(l_target, 0)
-            losses = criterion_att(out,l_target)[~mask]
+            gt_with_start = gt_with_start.view(-1)
+            mask = torch.eq(gt_with_start, 0)
+            losses = criterion_att(out,gt_with_start)[~mask]
             losses = torch.sum(losses)/config.Train.batch_size
         else:
             ctc_out, attn_out = model(imgs, l_target)
@@ -49,12 +49,12 @@ def train(train_loader, model, criterion_ctc, criterion_att,optimizer,epoch,sche
             preds_length = torch.IntTensor([preds.size(0)] * config.Train.batch_size).cuda(config.Global.gpu, non_blocking=True)
             ctc_losses = criterion_ctc(preds, targets, preds_length, length)
 
-            l_target = torch.zeros(config.Train.batch_size,config.Global.out_seq_len,
+            gt_with_start = torch.zeros(config.Train.batch_size,config.Global.out_seq_len,
                    dtype=torch.long).cuda(config.Global.gpu, non_blocking=True)
-            l_target[:, 1:-1] = targets
-            l_target = l_target.view(-1)
-            mask = torch.eq(l_target, 0)
-            attn_losses = criterion_att(attn_out,l_target)[~mask]
+            gt_with_start[:, 1:] = targets[:,:-1]# sos is 
+            gt_with_start = gt_with_start.view(-1)
+            mask = torch.eq(gt_with_start, 0)
+            attn_losses = criterion_att(attn_out,gt_with_start)[~mask]
             attn_losses = torch.mean(attn_losses)
             losses = ctc_losses + attn_losses
 
@@ -103,9 +103,9 @@ def validate(val_loader, model, epoch,id2char, config):
         for i in range(preds.shape[0]):
             text_target = text[i]
             if config.Global.loss == "ctc":
-                text_pred = idx2str_ctc(preds[i],id2char)
+                text_pred = idx2str_ctc(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
             elif config.Global.loss == "attn":
-                text_pred = idx2str_attn(preds[i],id2char)
+                text_pred = idx2str_attn(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
             pred_list.append(text_pred)
             target_list.append(text_target)
         if (batch_idx+1) % config.Global.print_feq == 0:

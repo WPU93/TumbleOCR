@@ -55,19 +55,19 @@ def char_accurate(predict,target):
     char_acc = ratio_sum/len(target)
     return char_acc
 
-def idx2str_ctc(idx,id2char):
+def idx2str_ctc(idx,id2char,PAD=0,UNK=6624,EOS=6625,SOS=6625):
     text = ""
     for i in range(len(idx)):
-        if idx[i]!=0 and idx[i]!= 6624 and (not (i>0 and idx[i-1]==idx[i])): # PAD & UNK
+        if idx[i]!=PAD and idx[i]!=UNK and (not (i>0 and idx[i-1]==idx[i])): # PAD & UNK
             text += id2char[idx[i]]
     return text
 
-def idx2str_attn(idx,id2char):
+def idx2str_attn(idx,id2char,PAD=0,UNK=6624,EOS=6625,SOS=6625):
     text = ""
     for i in range(len(idx)):
-        if idx[i] == 0 or idx[i] == 6625:# EOS & PAD
+        if idx[i]==PAD or idx[i]==EOS:# EOS & PAD
             break
-        elif idx[i] == 6624:# UNK
+        elif idx[i]==UNK:# UNK
             continue
         else: 
             text += id2char[idx[i]]

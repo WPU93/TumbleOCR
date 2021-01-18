@@ -86,36 +86,32 @@ class myModel(nn.Module):
         self.encoder = encoder(config)
         self.decoder = decoder(config)
         self.Prediction = Prediction_FC(self.decoder.out_channels, config.Global.num_classes)
-        self.Prediction_attn= Prediction_FC(self.decoder.out_channels, config.Global.num_classes)
+        # self.Prediction_attn = Prediction_FC(self.decoder.out_channels, config.Global.num_classes)
     def forward(self, image, target=None):
         if self.tps != None:
             image = self.tps(image)
         feature = self.featureExtractor(image)
         hidden_en = self.encoder(feature)
-        ctc_out,attn_out = self.decoder(hidden_en,feature,target=target)
         if self.loss_type == "ctc":
+            ctc_out = self.decoder(hidden_en,feature,target=target)
             ctc_out = self.Prediction(ctc_out)
-            ctc_out =  F.log_softmax(ctc_out,dim=2)
+            ctc_out = F.log_softmax(ctc_out,dim=2)
             if not self.training:
                 idxscore, idx = torch.max(ctc_out, 2)
                 return idx
             return ctc_out
-        elif self.loss_type == "attn":
-            attn_out = self.Prediction_attn(attn_out)
-            attn_out = F.log_softmax(attn_out,dim=2)
-            if not self.training:
-                idxscore, idx = torch.max(attn_out, 2)
-                return idx[:,1:]
-            return attn_out
-        else:
-            ctc_out = self.Prediction(ctc_out)
-            attn_out = self.Prediction_attn(attn_out)
-            ctc_out =  F.log_softmax(ctc_out,dim=2)
-            attn_out = F.log_softmax(attn_out,dim=2)
-            if not self.training:
-                idxscore, idx = torch.max(ctc_out+attn_out, 2)
-                return idx[:,1:]
-            return ctc_out,attn_out
+        # elif self.loss_type == "attn":
+        #     attn_out = self.decoder(hidden_en,feature,target=target)
+        #     return attn_out
+        # else:
+        #     ctc_out = self.Prediction(ctc_out)
+        #     attn_out = self.Prediction_attn(attn_out)
+        #     ctc_out =  F.log_softmax(ctc_out,dim=2)
+        #     attn_out = F.log_softmax(attn_out,dim=2)
+        #     if not self.training:
+        #         idxscore, idx = torch.max(ctc_out+attn_out, 2)
+        #         return idx[:,1:]
+        #     return ctc_out,attn_out
 
 
 def create_model(arch_name):
