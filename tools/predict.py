@@ -22,7 +22,7 @@ from tumbocr.utils.utils import seq_accurate,char_accurate
 from tumbocr.utils.utils import idx2str_ctc,idx2str_attn
 from tumbocr.utils.utils import from_pretrained,load_config
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 def E_trans_to_C(string):
     E_pun = u':,.!?[]()<>"\''
     C_pun = u'：，。！？【】（）《》“‘'
@@ -30,7 +30,7 @@ def E_trans_to_C(string):
     return string.translate(table)
 
 def main():
-    cfg = load_config("configs/rec_attn_ctc_mbv3_config.yaml")
+    cfg = load_config("configs/rec_sar_train_config.yaml")
     cfg = EasyDict(cfg)
     ngpus_per_node = torch.cuda.device_count()
     char2id,id2char = get_vocabulary(cfg.Global.dict_path)
@@ -38,7 +38,7 @@ def main():
     cfg.Global.device = "cuda" if ngpus_per_node > 0 else "cpu"
     cfg.Global.num_classes = len(char2id)
     # pretrained_path = "../save_models/myModel-MobileNetV3-1-9999.pth"
-    pretrained_path = "../save_models/myModel-rec-cn-MobileNetV3L-attn-1-4999.pth"
+    pretrained_path = "../save_models/ResNet-en-ctc-0-19999.pth"
     model = create_model(cfg.Model.arch)(cfg).cuda()
     model = from_pretrained(model,pretrained_path)
     model.eval()
@@ -66,23 +66,23 @@ def main():
             imgs = imgs.cuda(cfg.Global.gpu, non_blocking=True)
             targets = targets.cuda(cfg.Global.gpu, non_blocking=True)
             st = time.time()
-            if cfg.Global.loss == "attn":
+            if cfg.Global.loss == "ctc":
                 pred_tensor = model(imgs, targets)
                 preds = pred_tensor.cpu().numpy()
-            if cfg.Global.loss == "ctc":
+            elif cfg.Global.loss == "attn" or cfg.Global.loss == "sar":
                 pred_tensor = model(imgs)
                 preds = pred_tensor.cpu().detach().numpy()
             cost = time.time()-st
             targets = targets.cpu().numpy()
-            print(targets,preds)
+            # print(targets,preds)
             for i in range(preds.shape[0]):
                 text_target = text[i]
                 if cfg.Global.loss == "ctc":
-                    text_pred = idx2str_ctc(preds[i],id2char)
-                elif cfg.Global.loss == "attn":
-                    text_pred = idx2str_attn(preds[i],id2char)
-                # if E_trans_to_C(text_target)!=E_trans_to_C(text_pred):
-                print("pred:{}\tlabel:{}\tcost:{}".format(text_pred,text_target,cost))
+                    text_pred = idx2str_ctc(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
+                elif cfg.Global.loss == "attn" or cfg.Global.loss == "sar":
+                    text_pred = idx2str_attn(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
+                if text_target!=text_pred:
+                    print("pred:{}\tlabel:{}\tcost:{}".format(text_pred,text_target,cost))
                 # wf.write(text_target+"\t"+text_pred+"\n")
                 pred_list.append(text_pred)
                 target_list.append(text_target)

@@ -11,7 +11,7 @@ import onnxruntime
 from tumbocr.utils.utils import from_pretrained,load_config
 from tumbocr.data.data_utils import get_vocabulary
 from tumbocr.models.create_model import create_model
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def load_torch_model(congfig_path):
     cfg = EasyDict(load_config(congfig_path))
@@ -39,11 +39,11 @@ def quantize_model(config,pretrain_path,quantized_path):
 def check_model(config,pretrain_path=None):
     torch_model = load_torch_model(config)
     # print(torch_model)
-    input_tensor = torch.randn(10,3,48,160).cuda()
-    target_tensor = torch.zeros(10,97).cuda()
+    input_tensor = torch.randn(2,3,48,160).cuda()
+    target_tensor = torch.zeros(2,97).cuda()
     output = torch_model(input_tensor,target_tensor)
-    torch.save(torch_model.state_dict(), "lite_model/model.pth")
     print(output.shape)
+    # torch.save(torch_model.state_dict(), "lite_model/model.pth")
 
 if __name__ == '__main__':
     congfig_path = sys.argv[1]

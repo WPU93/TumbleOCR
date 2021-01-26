@@ -1,11 +1,12 @@
 import os
 import sys
+import time
+from einops import rearrange
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '..')))
 
-import time
 import torch
 from torch import nn
 import torch.utils.data as data
@@ -30,7 +31,7 @@ def train(train_loader, model, criterion_ctc, criterion_att,optimizer,epoch,sche
         data_time.update(time.time() - st)
         if config.Global.loss == "ctc":
             preds = model(imgs)# b T C
-            preds = preds.permute(1, 0, 2)# b,T,C -> T,b,C
+            preds = rearrange(preds,"b T c -> T b c")
             preds_length = torch.IntTensor([preds.size(0)] * config.Train.batch_size).cuda(config.Global.gpu, non_blocking=True)
             losses = criterion_ctc(preds, targets, preds_length, length)
         elif config.Global.loss == "attn" :
@@ -43,20 +44,16 @@ def train(train_loader, model, criterion_ctc, criterion_att,optimizer,epoch,sche
             mask = torch.eq(gt_with_start, 0)
             losses = criterion_att(out,gt_with_start)[~mask]
             losses = torch.sum(losses)/config.Train.batch_size
-        else:
-            ctc_out, attn_out = model(imgs, l_target)
-            preds = preds.permute(1, 0, 2)# b,T,C -> T,b,C
-            preds_length = torch.IntTensor([preds.size(0)] * config.Train.batch_size).cuda(config.Global.gpu, non_blocking=True)
-            ctc_losses = criterion_ctc(preds, targets, preds_length, length)
-
-            gt_with_start = torch.zeros(config.Train.batch_size,config.Global.out_seq_len,
+        elif config.Global.loss == "sar":
+            l_target = torch.zeros(config.Train.batch_size,config.Global.out_seq_len+2,
                    dtype=torch.long).cuda(config.Global.gpu, non_blocking=True)
-            gt_with_start[:, 1:] = targets[:,:-1]# sos is 
-            gt_with_start = gt_with_start.view(-1)
-            mask = torch.eq(gt_with_start, 0)
-            attn_losses = criterion_att(attn_out,gt_with_start)[~mask]
-            attn_losses = torch.mean(attn_losses)
-            losses = ctc_losses + attn_losses
+            l_target[:, 1:-1] = targets
+            out = model(imgs, targets)
+            out = out.view(-1,config.Global.num_classes)
+            l_target = l_target.view(-1)
+            mask = torch.eq(l_target, 0)
+            losses = criterion_att(out,l_target)[~mask]
+            losses = torch.sum(losses)/config.Train.batch_size
 
         loss_avg = losses.mean()
         lr=optimizer.param_groups[0]['lr']
@@ -94,17 +91,16 @@ def validate(val_loader, model, epoch,id2char, config):
         if config.Global.loss == "ctc":
             pred_tensor = model(imgs)
             preds = pred_tensor.cpu().detach().numpy()
-        elif config.Global.loss == "attn":
+        elif cfg.Global.loss == "attn" or cfg.Global.loss == "sar":
             pred_tensor = model(imgs, targets)
             preds = pred_tensor.cpu().numpy()
-    
         batch_pred_time.update(time.time() - st)
         targets = targets.cpu().numpy()
         for i in range(preds.shape[0]):
             text_target = text[i]
             if config.Global.loss == "ctc":
                 text_pred = idx2str_ctc(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
-            elif config.Global.loss == "attn":
+            elif cfg.Global.loss == "attn" or cfg.Global.loss == "sar":
                 text_pred = idx2str_attn(preds[i],id2char,PAD=0,UNK=len(id2char)-2,EOS=len(id2char)-1)
             pred_list.append(text_pred)
             target_list.append(text_target)

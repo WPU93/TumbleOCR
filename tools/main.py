@@ -2,6 +2,7 @@ import os
 import sys
 from easydict import EasyDict
 
+
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '..')))
@@ -11,8 +12,9 @@ from torch import nn
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
+
 # data
-from tumbocr.data.loadRecDataset import recDataset
+from tumbocr.data.load_rec_data import recDataset
 from tumbocr.data.data_utils import get_vocabulary
 from tumbocr.models.create_model import create_model
 from tumbocr.optim_factory import create_optimizer
