@@ -67,7 +67,6 @@ class recDataset(Dataset):
         return image_path 
     def __getitem__(self, index):
         image_path = self.images_list[index]
-        image_path = image_path.replace("filer.ai.yy.com:9899","10.28.32.57:9200")
         label = self.labels_list[index]
         length = self.length_list[index]
         text = self.texts_list[index]
